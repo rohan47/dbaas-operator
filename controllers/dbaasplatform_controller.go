@@ -27,11 +27,11 @@ import (
 	dbaasv1alpha1 "github.com/RHEcosystemAppEng/dbaas-operator/api/v1alpha1"
 	"github.com/RHEcosystemAppEng/dbaas-operator/controllers/reconcilers"
 	"github.com/RHEcosystemAppEng/dbaas-operator/controllers/reconcilers/console_plugin"
+	prominstall "github.com/RHEcosystemAppEng/dbaas-operator/controllers/reconcilers/prometheus"
 	providers_installation "github.com/RHEcosystemAppEng/dbaas-operator/controllers/reconcilers/providers-installation"
 	"github.com/RHEcosystemAppEng/dbaas-operator/controllers/reconcilers/quickstart_installation"
 
 	"github.com/go-logr/logr"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -72,6 +72,7 @@ type DBaaSPlatformReconciler struct {
 	Log                 logr.Logger
 	installComplete     bool
 	operatorNameVersion string
+	cr                  *dbaasv1alpha1.DBaaSPlatform
 }
 
 //+kubebuilder:rbac:groups=dbaas.redhat.com,resources=*,verbs=get;list;watch;create;update;patch;delete
@@ -95,6 +96,7 @@ func (r *DBaaSPlatformReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	logger := log.FromContext(ctx)
 
 	cr := &dbaasv1alpha1.DBaaSPlatform{}
+	r.cr = cr
 	err := r.Get(ctx, req.NamespacedName, cr)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -196,6 +198,7 @@ func (r *DBaaSPlatformReconciler) createPlatformCR(ctx context.Context, serverCl
 	}
 
 	var cr *dbaasv1alpha1.DBaaSPlatform
+	r.cr = cr
 	syncPeriod := 180
 	if len(dbaaSPlatformList.Items) == 0 {
 
@@ -242,6 +245,8 @@ func (r *DBaaSPlatformReconciler) getReconcilerForPlatform(platformConfig dbaasv
 		return console_plugin.NewReconciler(r.Client, r.Scheme, r.Log, platformConfig)
 	case dbaasv1alpha1.TypeQuickStart:
 		return quickstart_installation.NewReconciler(r.Client, r.Scheme, r.Log)
+	case dbaasv1alpha1.TypePrometheus:
+		return prominstall.NewReconciler(r.cr, r.Client, r.Scheme)
 	}
 
 	return nil
